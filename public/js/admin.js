@@ -38,9 +38,6 @@
     app.classList.add('hidden');
   });
 
-  applyAuth();
-  if (adminToken) loadOffers();
-
   // ---- Tabs ----
 
   window.switchTab = (tab) => {
@@ -170,6 +167,10 @@
   });
 
   // ---- Orders ----
+
+  // Init — called after all functions are defined
+  applyAuth();
+  if (adminToken) loadOffers();
 
   window.loadOrders = async () => {
     document.getElementById('orders-loading').classList.remove('hidden');
