@@ -3,10 +3,21 @@ const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('../db');
 
+function calcAmounts(offer) {
+  const base = parseFloat(offer.amount);
+  const discPct = parseFloat(offer.discount_percent) || 0;
+  const discounted = discPct > 0 ? base * (1 - discPct / 100) : base;
+  const withVat = discounted * 1.22;
+  return { base, discPct, discounted, withVat };
+}
+
 router.get('/validate/:code', async (req, res) => {
   try {
     const result = await db.query(
-      'SELECT id, code, description, amount, currency, billing_cycle FROM offers WHERE UPPER(code) = UPPER($1) AND is_active = true',
+      `SELECT id, code, description, amount, currency, billing_cycle, billing_months,
+              discount_percent, company_name
+       FROM offers
+       WHERE UPPER(code) = UPPER($1) AND is_active = true`,
       [req.params.code.trim()]
     );
 
@@ -14,15 +25,22 @@ router.get('/validate/:code', async (req, res) => {
       return res.status(404).json({ valid: false, message: 'Codice non valido o scaduto' });
     }
 
-    const offer = result.rows[0];
+    const o = result.rows[0];
+    const { base, discPct, discounted, withVat } = calcAmounts(o);
+
     res.json({
       valid: true,
       offer: {
-        code: offer.code,
-        description: offer.description,
-        amount: parseFloat(offer.amount),
-        currency: offer.currency,
-        billing_cycle: offer.billing_cycle,
+        code: o.code,
+        description: o.description,
+        amount: base,
+        discount_percent: discPct,
+        discounted_amount: discounted,
+        amount_with_vat: withVat,
+        currency: o.currency,
+        billing_cycle: o.billing_cycle,
+        billing_months: o.billing_months,
+        company_name: o.company_name,
       },
     });
   } catch (err) {
@@ -46,12 +64,13 @@ router.post('/checkout', async (req, res) => {
     }
 
     const offer = result.rows[0];
-    const amountCents = Math.round(parseFloat(offer.amount) * 100);
+    const { discounted, withVat } = calcAmounts(offer);
+    const amountCents = Math.round(withVat * 100);
     const isRecurring = offer.billing_cycle === 'recurring_monthly';
 
     const priceData = {
       currency: offer.currency.toLowerCase(),
-      product_data: { name: offer.description },
+      product_data: { name: offer.description.split('\n')[0] },
       unit_amount: amountCents,
     };
 
@@ -59,7 +78,7 @@ router.post('/checkout', async (req, res) => {
       priceData.recurring = { interval: 'month' };
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams = {
       payment_method_types: ['card'],
       line_items: [{ price_data: priceData, quantity: 1 }],
       mode: isRecurring ? 'subscription' : 'payment',
@@ -69,7 +88,18 @@ router.post('/checkout', async (req, res) => {
         offer_id: offer.id.toString(),
         offer_code: offer.code,
       },
-    });
+    };
+
+    if (isRecurring && offer.billing_months) {
+      const cancelDate = new Date();
+      cancelDate.setMonth(cancelDate.getMonth() + parseInt(offer.billing_months));
+      sessionParams.subscription_data = {
+        cancel_at: Math.floor(cancelDate.getTime() / 1000),
+        metadata: { billing_months: offer.billing_months.toString() },
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     await db.query(
       'INSERT INTO orders (offer_id, stripe_session_id, status) VALUES ($1, $2, $3)',

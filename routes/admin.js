@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { sendOfferEmail } = require('../services/email');
 
 const adminAuth = (req, res, next) => {
   const token = req.headers['x-admin-token'];
@@ -24,7 +25,14 @@ router.get('/offers', async (req, res) => {
 });
 
 router.post('/offers', async (req, res) => {
-  const { code, description, amount, currency = 'EUR', billing_cycle } = req.body;
+  const {
+    code, description, amount, currency = 'EUR',
+    billing_cycle, billing_months,
+    discount_percent,
+    company_name, company_address, company_zip,
+    company_pec, company_phone, company_sdi,
+    send_email, client_email,
+  } = req.body;
 
   if (!code || !description || amount == null || !billing_cycle) {
     return res.status(400).json({ error: 'Campi obbligatori mancanti: code, description, amount, billing_cycle' });
@@ -36,10 +44,35 @@ router.post('/offers', async (req, res) => {
 
   try {
     const result = await db.query(
-      'INSERT INTO offers (code, description, amount, currency, billing_cycle) VALUES (UPPER($1), $2, $3, $4, $5) RETURNING *',
-      [code, description, amount, currency.toUpperCase(), billing_cycle]
+      `INSERT INTO offers (
+         code, description, amount, currency, billing_cycle, billing_months,
+         discount_percent,
+         company_name, company_address, company_zip, company_pec, company_phone, company_sdi
+       ) VALUES (
+         UPPER($1), $2, $3, $4, $5, $6,
+         $7,
+         $8, $9, $10, $11, $12, $13
+       ) RETURNING *`,
+      [
+        code, description, amount, currency.toUpperCase(), billing_cycle,
+        billing_months ? parseInt(billing_months) : null,
+        discount_percent ? parseFloat(discount_percent) : null,
+        company_name   || null, company_address || null, company_zip  || null,
+        company_pec    || null, company_phone   || null, company_sdi  || null,
+      ]
     );
-    res.status(201).json(result.rows[0]);
+
+    const offer = result.rows[0];
+
+    if (send_email && client_email) {
+      const base = process.env.BASE_URL || '';
+      const offerUrl = `${base}/?code=${encodeURIComponent(offer.code)}`;
+      sendOfferEmail({ to: client_email, offer, offerUrl }).catch((err) => {
+        console.error('[email] send failed:', err.message);
+      });
+    }
+
+    res.status(201).json(offer);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Codice già esistente' });
@@ -81,7 +114,7 @@ router.get('/orders', async (req, res) => {
         o.customer_email, o.status, o.amount_paid,
         o.created_at, o.completed_at,
         of.code AS offer_code, of.description AS offer_description,
-        of.billing_cycle
+        of.billing_cycle, of.billing_months
       FROM orders o
       LEFT JOIN offers of ON o.offer_id = of.id
       ORDER BY o.created_at DESC
