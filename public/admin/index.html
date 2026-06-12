@@ -8,11 +8,11 @@
   <style>
     .tab-active   { border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 600; }
     .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
-    .badge-active   { background: #dcfce7; color: #166534; }
-    .badge-inactive { background: #fee2e2; color: #991b1b; }
-    .badge-pending  { background: #fef9c3; color: #854d0e; }
+    .badge-active    { background: #dcfce7; color: #166534; }
+    .badge-inactive  { background: #fee2e2; color: #991b1b; }
+    .badge-pending   { background: #fef9c3; color: #854d0e; }
     .badge-completed { background: #dcfce7; color: #166534; }
-    .badge-failed   { background: #fee2e2; color: #991b1b; }
+    .badge-failed    { background: #fee2e2; color: #991b1b; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans">
@@ -21,23 +21,17 @@
   <div id="login-overlay" class="fixed inset-0 bg-gray-900/80 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
       <h2 class="text-xl font-bold text-gray-800 mb-6 text-center">Accesso Amministratore</h2>
-      <input
-        id="token-input"
-        type="password"
-        placeholder="Admin token"
-        class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-      />
+      <input id="token-input" type="password" placeholder="Admin token"
+        class="w-full border border-gray-300 rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
       <div id="login-error" class="hidden text-red-500 text-sm mb-3">Token non valido</div>
-      <button
-        id="login-btn"
-        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition"
-      >
+      <button id="login-btn"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition">
         Accedi
       </button>
     </div>
   </div>
 
-  <!-- App shell (hidden until logged in) -->
+  <!-- App shell -->
   <div id="app" class="hidden">
 
     <header class="bg-white shadow-sm">
@@ -64,30 +58,72 @@
 
         <!-- Create form -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-          <h2 class="text-lg font-bold text-gray-800 mb-5">Nuova Offerta</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <h2 class="text-lg font-bold text-gray-800 mb-6">Nuova Offerta</h2>
+
+          <!-- Codice + Prezzo + Sconto -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1">Codice</label>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Codice *</label>
               <input id="f-code" type="text" placeholder="OFFERTA50"
                 class="w-full border border-gray-300 rounded-xl px-4 py-2.5 font-mono uppercase text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1">Prezzo (€)</label>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">
+                Prezzo * <span class="text-gray-400 font-normal normal-case">IVA Esclusa</span>
+              </label>
               <input id="f-amount" type="number" min="0" step="0.01" placeholder="490.00"
-                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold text-gray-500 mb-1">Descrizione</label>
-              <input id="f-description" type="text" placeholder="Consulenza VerticalAI Premium"
-                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                oninput="updatePricePreview()" />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1">Ricorrenza</label>
-              <select id="f-billing"
+              <label class="block text-xs font-semibold text-gray-500 mb-1">
+                Sconto <span class="text-gray-400 font-normal">(%)</span>
+              </label>
+              <input id="f-discount" type="number" min="0" max="100" step="1" placeholder="0"
+                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                oninput="updatePricePreview()" />
+            </div>
+          </div>
+
+          <!-- Anteprima prezzo -->
+          <div id="price-preview" class="hidden mb-5 px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm flex flex-wrap gap-4 items-center">
+            <span class="text-gray-500">Prezzo cliente:</span>
+            <span id="pp-original" class="text-gray-400 line-through text-sm"></span>
+            <span id="pp-discounted" class="text-indigo-700 font-bold text-lg"></span>
+            <span class="text-gray-400 text-xs">IVA esclusa</span>
+            <span class="text-gray-500 mx-1">·</span>
+            <span class="text-gray-500">Con IVA (22%):</span>
+            <span id="pp-vat" class="font-semibold text-gray-700"></span>
+          </div>
+
+          <!-- Descrizione multi-paragrafo -->
+          <div class="mb-5">
+            <label class="block text-xs font-semibold text-gray-500 mb-2">Descrizione *</label>
+            <div id="description-container" class="flex flex-col gap-2"></div>
+            <button type="button" id="add-desc-btn"
+              class="mt-2 text-xs text-indigo-500 hover:text-indigo-700 font-semibold flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+              Aggiungi paragrafo
+            </button>
+          </div>
+
+          <!-- Tipo pagamento -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Tipo Pagamento *</label>
+              <select id="f-billing-type" onchange="onBillingTypeChange()"
                 class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="recurring_monthly">Mensile (abbonamento)</option>
-                <option value="one_time">Una tantum (pagamento unico)</option>
+                <option value="one_time">Pagamento unico (una tantum)</option>
+                <option value="recurring">Ricorrente mensile (senza scadenza)</option>
+                <option value="recurring_limited">Ricorrente mensile (numero di mesi)</option>
               </select>
+            </div>
+            <div id="billing-months-wrap" class="hidden">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Numero di mesi *</label>
+              <input id="f-billing-months" type="number" min="1" step="1" placeholder="12"
+                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1">Valuta</label>
@@ -99,7 +135,70 @@
               </select>
             </div>
           </div>
+
+          <!-- Intestazione fattura -->
+          <div class="mb-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-gray-700">Intestazione Fattura
+                <span class="text-gray-400 font-normal text-xs ml-1">(opzionale)</span>
+              </h3>
+              <button type="button" id="toggle-invoice-btn" onclick="toggleInvoice()"
+                class="text-xs text-indigo-500 hover:text-indigo-700">Mostra campi</button>
+            </div>
+            <div id="invoice-fields" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Nome Azienda / Cliente</label>
+                <input id="f-company-name" type="text" placeholder="Acme S.r.l."
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Indirizzo</label>
+                <input id="f-company-address" type="text" placeholder="Via Roma 1, Milano"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">CAP</label>
+                <input id="f-company-zip" type="text" placeholder="20100"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Telefono</label>
+                <input id="f-company-phone" type="text" placeholder="+39 02 1234567"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">PEC</label>
+                <input id="f-company-pec" type="email" placeholder="pec@pec.azienda.it"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Codice SDI</label>
+                <input id="f-company-sdi" type="text" placeholder="XXXXXXX"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Invio email -->
+          <div class="mb-5 p-4 bg-gray-50 rounded-xl border border-gray-100">
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+              <input id="f-send-email" type="checkbox" onchange="toggleEmailField()"
+                class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-400" />
+              <span class="text-sm font-semibold text-gray-700">Invia offerta via email al cliente</span>
+            </label>
+            <div id="email-field-wrap" class="hidden mt-3">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Email Cliente</label>
+              <input id="f-client-email" type="email" placeholder="cliente@azienda.it"
+                class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <p class="text-xs text-gray-400 mt-1">
+                Verrà inviata un'email con il link diretto all'offerta tramite Resend.
+              </p>
+            </div>
+          </div>
+
           <div id="form-error" class="hidden text-red-500 text-sm mb-3"></div>
+          <div id="form-success" class="hidden text-green-600 text-sm mb-3"></div>
+
           <button id="create-btn"
             class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition">
             Crea Offerta
@@ -109,24 +208,26 @@
         <!-- Offers table -->
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 class="text-lg font-bold text-gray-800">Offerte Attive</h2>
+            <h2 class="text-lg font-bold text-gray-800">Offerte</h2>
             <button onclick="loadOffers()" class="text-xs text-indigo-500 hover:text-indigo-700">↻ Aggiorna</button>
           </div>
           <div id="offers-loading" class="p-8 text-center text-gray-400 text-sm">Caricamento…</div>
-          <div id="offers-empty"  class="hidden p-8 text-center text-gray-400 text-sm">Nessuna offerta trovata.</div>
-          <table id="offers-table" class="hidden w-full text-sm">
-            <thead class="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Codice</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Descrizione</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Prezzo</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Ricorrenza</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Stato</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Azioni</th>
-              </tr>
-            </thead>
-            <tbody id="offers-body" class="divide-y divide-gray-50"></tbody>
-          </table>
+          <div id="offers-empty" class="hidden p-8 text-center text-gray-400 text-sm">Nessuna offerta trovata.</div>
+          <div class="overflow-x-auto">
+            <table id="offers-table" class="hidden w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Codice</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Cliente / Descrizione</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Prezzo</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Ricorrenza</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Stato</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="offers-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -138,20 +239,22 @@
             <button onclick="loadOrders()" class="text-xs text-indigo-500 hover:text-indigo-700">↻ Aggiorna</button>
           </div>
           <div id="orders-loading" class="p-8 text-center text-gray-400 text-sm">Caricamento…</div>
-          <div id="orders-empty"  class="hidden p-8 text-center text-gray-400 text-sm">Nessun ordine trovato.</div>
-          <table id="orders-table" class="hidden w-full text-sm">
-            <thead class="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Data</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Email</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Codice</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Importo</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Tipo</th>
-                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Stato</th>
-              </tr>
-            </thead>
-            <tbody id="orders-body" class="divide-y divide-gray-50"></tbody>
-          </table>
+          <div id="orders-empty" class="hidden p-8 text-center text-gray-400 text-sm">Nessun ordine trovato.</div>
+          <div class="overflow-x-auto">
+            <table id="orders-table" class="hidden w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Data</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Email</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Codice</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Importo</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Tipo</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500">Stato</th>
+                </tr>
+              </thead>
+              <tbody id="orders-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 

@@ -3,6 +3,7 @@
   const validateBtn = document.getElementById('validate-btn');
   const errorMsg   = document.getElementById('error-msg');
   const errorText  = document.getElementById('error-text');
+  const loadingMsg = document.getElementById('loading-msg');
   const offerBox   = document.getElementById('offer-box');
   const payBtn     = document.getElementById('pay-btn');
   const payBtnText = document.getElementById('pay-btn-text');
@@ -11,45 +12,106 @@
   let currentCode = null;
   let debounceTimer = null;
 
+  const fmt = (amount, currency = 'EUR') =>
+    new Intl.NumberFormat('it-IT', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount);
+
   function showError(msg) {
     errorText.textContent = msg;
     errorMsg.classList.remove('hidden');
+    loadingMsg.classList.add('hidden');
     offerBox.classList.add('hidden');
     currentCode = null;
   }
 
-  function hideError() {
-    errorMsg.classList.add('hidden');
+  function hideError() { errorMsg.classList.add('hidden'); }
+
+  function showLoading() {
+    hideError();
+    loadingMsg.classList.remove('hidden');
+    offerBox.classList.add('hidden');
   }
+
+  function hideLoading() { loadingMsg.classList.add('hidden'); }
 
   function showOffer(offer) {
     hideError();
+    hideLoading();
     currentCode = offer.code;
 
-    document.getElementById('offer-description').textContent = offer.description;
-    document.getElementById('offer-code').textContent        = offer.code;
+    // Greeting
+    const greeting = document.getElementById('offer-greeting');
+    greeting.textContent = offer.company_name
+      ? `Offerta per ${offer.company_name}`
+      : 'La tua offerta esclusiva';
 
-    const formatter = new Intl.NumberFormat('it-IT', {
-      style: 'currency', currency: offer.currency, minimumFractionDigits: 0,
+    // Description — render each paragraph
+    const descEl = document.getElementById('offer-description');
+    descEl.innerHTML = '';
+    const paras = (offer.description || '').split(/\n+/).filter(Boolean);
+    paras.forEach((p) => {
+      const el = document.createElement('p');
+      el.textContent = p;
+      descEl.appendChild(el);
     });
 
-    document.getElementById('offer-price').textContent = formatter.format(offer.amount);
-
+    // Pricing
     const isRecurring = offer.billing_cycle === 'recurring_monthly';
-    document.getElementById('offer-cycle').textContent = isRecurring ? '/mese' : 'una tantum';
-    document.getElementById('offer-badge').textContent  = isRecurring ? 'Abbonamento mensile' : 'Pagamento unico';
+    const cycleLabel  = isRecurring ? '/mese' : ' una tantum';
+    const cycleLabelVat = isRecurring ? '/mese' : '';
+
+    if (offer.discount_percent > 0) {
+      const origEl = document.getElementById('offer-price-original');
+      origEl.textContent = fmt(offer.amount, offer.currency);
+      origEl.classList.remove('hidden');
+      document.getElementById('offer-discount-badge').textContent = `−${offer.discount_percent}%`;
+      document.getElementById('offer-discount-badge').classList.remove('hidden');
+    }
+
+    document.getElementById('offer-price').textContent   = fmt(offer.discounted_amount, offer.currency);
+    document.getElementById('offer-cycle').textContent   = cycleLabel;
+    document.getElementById('offer-price-vat').textContent = fmt(offer.amount_with_vat, offer.currency);
+    document.getElementById('offer-cycle-vat').textContent = cycleLabelVat;
+    document.getElementById('offer-code').textContent    = offer.code;
+
+    // Badge
+    let badgeText = isRecurring ? 'Abbonamento mensile' : 'Pagamento unico';
+    if (isRecurring && offer.billing_months) {
+      badgeText = `${offer.billing_months} mesi`;
+    }
+    document.getElementById('offer-badge').textContent = badgeText;
+
+    // Invoice info
+    const invoiceEl   = document.getElementById('offer-invoice');
+    const invoiceBody = document.getElementById('offer-invoice-body');
+    const invoiceLines = [
+      offer.company_name,
+      offer.company_address,
+      offer.company_zip,
+      offer.company_pec   ? `PEC: ${offer.company_pec}`   : null,
+      offer.company_phone ? `Tel: ${offer.company_phone}` : null,
+      offer.company_sdi   ? `SDI: ${offer.company_sdi}`   : null,
+    ].filter(Boolean);
+
+    if (invoiceLines.length) {
+      invoiceBody.innerHTML = invoiceLines
+        .map((l) => `<p class="text-gray-600">${l}</p>`)
+        .join('');
+      invoiceEl.classList.remove('hidden');
+    } else {
+      invoiceEl.classList.add('hidden');
+    }
 
     offerBox.classList.remove('hidden');
   }
 
   async function validateCode(code) {
-    if (!code) { hideError(); offerBox.classList.add('hidden'); currentCode = null; return; }
+    if (!code) { hideError(); hideLoading(); offerBox.classList.add('hidden'); currentCode = null; return; }
 
+    showLoading();
     validateBtn.disabled = true;
     try {
-      const res = await fetch(`/api/validate/${encodeURIComponent(code)}`);
+      const res  = await fetch(`/api/validate/${encodeURIComponent(code)}`);
       const data = await res.json();
-
       if (res.ok && data.valid) {
         showOffer(data.offer);
       } else {
@@ -62,25 +124,25 @@
     }
   }
 
-  // Validate on button click
+  // ---- Input events ----
+
   validateBtn.addEventListener('click', () => {
     validateCode(input.value.trim().toUpperCase());
   });
 
-  // Validate on Enter key
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') validateCode(input.value.trim().toUpperCase());
   });
 
-  // Real-time debounced validation
   input.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const code = input.value.trim().toUpperCase();
-    if (!code) { hideError(); offerBox.classList.add('hidden'); currentCode = null; return; }
+    if (!code) { hideError(); hideLoading(); offerBox.classList.add('hidden'); currentCode = null; return; }
     debounceTimer = setTimeout(() => validateCode(code), 600);
   });
 
-  // Checkout
+  // ---- Checkout ----
+
   payBtn.addEventListener('click', async () => {
     if (!currentCode) return;
 
@@ -89,13 +151,12 @@
     payBtn.disabled = true;
 
     try {
-      const res = await fetch('/api/checkout', {
+      const res  = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: currentCode }),
       });
       const data = await res.json();
-
       if (res.ok && data.url) {
         window.location.href = data.url;
       } else {
@@ -111,4 +172,16 @@
       payBtn.disabled = false;
     }
   });
+
+  // ---- URL param auto-load ----
+
+  const urlCode = new URLSearchParams(window.location.search).get('code');
+  if (urlCode) {
+    // Hide input section, update subtitle, auto-load
+    document.getElementById('code-section').classList.add('hidden');
+    document.getElementById('page-subtitle').textContent =
+      'Stiamo caricando la tua offerta personalizzata…';
+    validateCode(urlCode.trim().toUpperCase());
+  }
+
 })();
