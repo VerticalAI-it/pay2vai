@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('../db');
 
 function calcAmounts(offer) {
@@ -49,9 +50,8 @@ router.get('/validate/:code', async (req, res) => {
 
 router.post('/checkout', async (req, res) => {
   try {
-    const { code, email } = req.body;
+    const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'Codice mancante' });
-    if (!email || !email.includes('@')) return res.status(400).json({ error: 'Email non valida' });
 
     const result = await db.query(
       'SELECT * FROM offers WHERE UPPER(code) = UPPER($1) AND is_active = true',
@@ -63,32 +63,59 @@ router.post('/checkout', async (req, res) => {
     }
 
     const offer = result.rows[0];
-    const { withVat } = calcAmounts(offer);
+    const { discounted, withVat } = calcAmounts(offer);
+    const amountCents = Math.round(withVat * 100);
+    const isRecurring = offer.billing_cycle === 'recurring_monthly' || offer.billing_cycle === 'recurring';
 
-    // Crea l'ordine come completato
-    const orderResult = await db.query(
-      `INSERT INTO orders (offer_id, stripe_session_id, customer_email, amount_paid, status, completed_at)
-       VALUES ($1, $2, $3, $4, 'completed', NOW())
-       RETURNING id`,
-      [offer.id, `manual-${Date.now()}`, email.trim(), parseFloat(withVat.toFixed(2))]
-    );
+    const priceData = {
+      currency: offer.currency.toLowerCase(),
+      product_data: { name: offer.description.split('\n')[0] },
+      unit_amount: amountCents,
+    };
 
-    // Incrementa use_count e disattiva l'offerta se raggiunge il limite
-    if (orderResult.rows.length > 0) {
-      await db.query(
-        `UPDATE offers
-         SET use_count = use_count + 1,
-             is_active = CASE WHEN use_count + 1 >= max_uses THEN false ELSE is_active END
-         WHERE id = $1`,
-        [offer.id]
-      );
+    if (isRecurring) {
+      if (offer.billing_cycle === 'recurring' && offer.billing_interval) {
+        priceData.recurring = {
+          interval: offer.billing_interval,
+          interval_count: offer.billing_interval_count || 1,
+        };
+      } else {
+        priceData.recurring = { interval: 'month', interval_count: 1 };
+      }
     }
 
-    const baseUrl = process.env.BASE_URL || '';
-    res.json({ url: `${baseUrl}/success` });
+    const sessionParams = {
+      payment_method_types: ['card'],
+      line_items: [{ price_data: priceData, quantity: 1 }],
+      mode: isRecurring ? 'subscription' : 'payment',
+      success_url: `${process.env.BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.BASE_URL}/cancel`,
+      metadata: {
+        offer_id: offer.id.toString(),
+        offer_code: offer.code,
+      },
+    };
+
+    if (isRecurring && offer.billing_months) {
+      const cancelDate = new Date();
+      cancelDate.setMonth(cancelDate.getMonth() + parseInt(offer.billing_months));
+      sessionParams.subscription_data = {
+        cancel_at: Math.floor(cancelDate.getTime() / 1000),
+        metadata: { billing_months: offer.billing_months.toString() },
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
+
+    await db.query(
+      'INSERT INTO orders (offer_id, stripe_session_id, status) VALUES ($1, $2, $3)',
+      [offer.id, session.id, 'pending']
+    );
+
+    res.json({ url: session.url });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Errore nella conferma dell\'offerta' });
+    res.status(500).json({ error: 'Errore nella creazione del checkout' });
   }
 });
 

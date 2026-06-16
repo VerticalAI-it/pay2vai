@@ -1,15 +1,13 @@
 (() => {
-  const input       = document.getElementById('code-input');
+  const input      = document.getElementById('code-input');
   const validateBtn = document.getElementById('validate-btn');
-  const errorMsg    = document.getElementById('error-msg');
-  const errorText   = document.getElementById('error-text');
-  const loadingMsg  = document.getElementById('loading-msg');
-  const offerBox    = document.getElementById('offer-box');
-  const payBtn      = document.getElementById('pay-btn');
-  const payBtnText  = document.getElementById('pay-btn-text');
-  const paySpinner  = document.getElementById('pay-spinner');
-  const emailInput  = document.getElementById('email-input');
-  const emailError  = document.getElementById('email-error');
+  const errorMsg   = document.getElementById('error-msg');
+  const errorText  = document.getElementById('error-text');
+  const loadingMsg = document.getElementById('loading-msg');
+  const offerBox   = document.getElementById('offer-box');
+  const payBtn     = document.getElementById('pay-btn');
+  const payBtnText = document.getElementById('pay-btn-text');
+  const paySpinner = document.getElementById('pay-spinner');
 
   let currentCode = null;
   let debounceTimer = null;
@@ -163,15 +161,7 @@
   payBtn.addEventListener('click', async () => {
     if (!currentCode) return;
 
-    const email = emailInput ? emailInput.value.trim() : '';
-    if (!email || !email.includes('@')) {
-      if (emailError) emailError.classList.remove('hidden');
-      emailInput && emailInput.focus();
-      return;
-    }
-    if (emailError) emailError.classList.add('hidden');
-
-    payBtnText.textContent = 'Conferma in corso…';
+    payBtnText.textContent = 'Reindirizzamento in corso…';
     paySpinner.classList.remove('hidden');
     payBtn.disabled = true;
 
@@ -179,20 +169,20 @@
       const res  = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: currentCode, email }),
+        body: JSON.stringify({ code: currentCode }),
       });
       const data = await res.json();
       if (res.ok && data.url) {
         window.location.href = data.url;
       } else {
-        showError(data.error || 'Errore nella conferma. Riprova.');
-        payBtnText.textContent = 'Conferma e attiva l\'offerta';
+        showError(data.error || 'Errore nel checkout. Riprova.');
+        payBtnText.textContent = 'Procedi al pagamento sicuro';
         paySpinner.classList.add('hidden');
         payBtn.disabled = false;
       }
     } catch {
       showError('Errore di connessione. Riprova.');
-      payBtnText.textContent = 'Conferma e attiva l\'offerta';
+      payBtnText.textContent = 'Procedi al pagamento sicuro';
       paySpinner.classList.add('hidden');
       payBtn.disabled = false;
     }
