@@ -14,11 +14,7 @@ function calcAmounts(offer) {
 router.get('/validate/:code', async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, code, description, amount, currency, billing_cycle, billing_months,
-              billing_interval, billing_interval_count,
-              discount_percent, company_name
-       FROM offers
-       WHERE UPPER(code) = UPPER($1) AND is_active = true`,
+      `SELECT * FROM offers WHERE UPPER(code) = UPPER($1) AND is_active = true`,
       [req.params.code.trim()]
     );
 
