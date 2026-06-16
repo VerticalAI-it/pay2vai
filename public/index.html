@@ -119,14 +119,25 @@
           Codice offerta: <span id="offer-code" class="font-mono font-semibold text-gray-600"></span>
         </p>
 
+        <div class="mb-4">
+          <label for="email-input" class="block text-sm font-medium text-gray-700 mb-1">La tua email</label>
+          <input
+            id="email-input"
+            type="email"
+            placeholder="es. mario.rossi@azienda.it"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+          />
+          <p id="email-error" class="hidden text-xs text-red-500 mt-1">Inserisci un'email valida.</p>
+        </div>
+
         <button id="pay-btn"
           class="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold py-4 rounded-xl text-base transition flex items-center justify-center gap-2">
-          <span id="pay-btn-text">Procedi al pagamento sicuro</span>
+          <span id="pay-btn-text">Conferma e attiva l'offerta</span>
           <div id="pay-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full spinner"></div>
         </button>
 
         <p class="text-xs text-center text-gray-400 mt-3">
-          Pagamento sicuro con <strong>Stripe</strong> · Nessuna commissione aggiuntiva
+          Riceverai conferma via email · Il team ti contatterà entro 24 ore
         </p>
       </div>
     </div>
@@ -135,7 +146,7 @@
 
   <footer class="text-center py-8 text-xs text-gray-400 space-y-1">
     <p class="font-medium text-gray-500">Vertical AI srl &mdash; P.IVA 13764720960</p>
-    <p>&copy; 2026 VerticalAI &middot; Pagamenti gestiti da Stripe</p>
+    <p>&copy; 2026 VerticalAI</p>
   </footer>
 
   <script src="/js/app.js"></script>

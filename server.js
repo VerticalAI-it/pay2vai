@@ -9,10 +9,8 @@ const adminRouter    = require('./routes/admin');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Stripe webhook requires the raw body — must be registered before express.json()
-app.use('/api/webhook', express.raw({ type: 'application/json' }), webhookRouter);
-
 app.use(express.json());
+app.use('/api/webhook', webhookRouter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/admin', adminRouter);
