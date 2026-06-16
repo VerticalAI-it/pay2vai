@@ -18,6 +18,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/admin', adminRouter);
 app.use('/api', checkoutRouter);
 
+app.get('/success', (req, res) => res.sendFile(path.join(__dirname, 'public', 'success.html')));
+app.get('/cancel',  (req, res) => res.sendFile(path.join(__dirname, 'public', 'cancel.html')));
+
 // SPA-style catch-all: serve index.html for unknown paths
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

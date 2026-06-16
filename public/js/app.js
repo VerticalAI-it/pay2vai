@@ -55,9 +55,18 @@
     });
 
     // Pricing
-    const isRecurring = offer.billing_cycle === 'recurring_monthly';
-    const cycleLabel  = isRecurring ? '/mese' : ' una tantum';
-    const cycleLabelVat = isRecurring ? '/mese' : '';
+    const isRecurring = offer.billing_cycle === 'recurring_monthly' || offer.billing_cycle === 'recurring';
+    let cycleLabel = isRecurring ? '/mese' : ' una tantum';
+    let cycleLabelVat = isRecurring ? '/mese' : '';
+
+    if (offer.billing_cycle === 'recurring' && offer.billing_interval) {
+      const count = offer.billing_interval_count || 1;
+      const singular = { day: 'giorno', week: 'settimana', month: 'mese', year: 'anno' };
+      const plural   = { day: 'giorni',  week: 'settimane', month: 'mesi',  year: 'anni'  };
+      const name = count === 1 ? singular[offer.billing_interval] : plural[offer.billing_interval];
+      cycleLabel = count === 1 ? `/${name}` : `ogni ${count} ${name}`;
+      cycleLabelVat = cycleLabel;
+    }
 
     if (offer.discount_percent > 0) {
       const origEl = document.getElementById('offer-price-original');
@@ -75,7 +84,13 @@
 
     // Badge
     let badgeText = isRecurring ? 'Abbonamento mensile' : 'Pagamento unico';
-    if (isRecurring && offer.billing_months) {
+    if (offer.billing_cycle === 'recurring' && offer.billing_interval) {
+      const count = offer.billing_interval_count || 1;
+      const singular = { day: 'giornaliero', week: 'settimanale', month: 'mensile', year: 'annuale' };
+      badgeText = count === 1
+        ? `Abbonamento ${singular[offer.billing_interval]}`
+        : `Ogni ${count} ${({ day: 'giorni', week: 'settimane', month: 'mesi', year: 'anni' })[offer.billing_interval]}`;
+    } else if (isRecurring && offer.billing_months) {
       badgeText = `${offer.billing_months} mesi`;
     }
     document.getElementById('offer-badge').textContent = badgeText;

@@ -15,6 +15,7 @@ router.get('/validate/:code', async (req, res) => {
   try {
     const result = await db.query(
       `SELECT id, code, description, amount, currency, billing_cycle, billing_months,
+              billing_interval, billing_interval_count,
               discount_percent, company_name
        FROM offers
        WHERE UPPER(code) = UPPER($1) AND is_active = true`,
@@ -40,6 +41,8 @@ router.get('/validate/:code', async (req, res) => {
         currency: o.currency,
         billing_cycle: o.billing_cycle,
         billing_months: o.billing_months,
+        billing_interval: o.billing_interval,
+        billing_interval_count: o.billing_interval_count,
         company_name: o.company_name,
       },
     });
@@ -66,7 +69,7 @@ router.post('/checkout', async (req, res) => {
     const offer = result.rows[0];
     const { discounted, withVat } = calcAmounts(offer);
     const amountCents = Math.round(withVat * 100);
-    const isRecurring = offer.billing_cycle === 'recurring_monthly';
+    const isRecurring = offer.billing_cycle === 'recurring_monthly' || offer.billing_cycle === 'recurring';
 
     const priceData = {
       currency: offer.currency.toLowerCase(),
@@ -75,7 +78,14 @@ router.post('/checkout', async (req, res) => {
     };
 
     if (isRecurring) {
-      priceData.recurring = { interval: 'month' };
+      if (offer.billing_cycle === 'recurring' && offer.billing_interval) {
+        priceData.recurring = {
+          interval: offer.billing_interval,
+          interval_count: offer.billing_interval_count || 1,
+        };
+      } else {
+        priceData.recurring = { interval: 'month', interval_count: 1 };
+      }
     }
 
     const sessionParams = {

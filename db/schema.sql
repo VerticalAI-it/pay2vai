@@ -4,8 +4,10 @@ CREATE TABLE IF NOT EXISTS offers (
   description      TEXT NOT NULL,
   amount           DECIMAL(10, 2) NOT NULL,
   currency         VARCHAR(3) NOT NULL DEFAULT 'EUR',
-  billing_cycle    VARCHAR(30) NOT NULL CHECK (billing_cycle IN ('one_time', 'recurring_monthly')),
-  billing_months   INTEGER,
+  billing_cycle         VARCHAR(30) NOT NULL CHECK (billing_cycle IN ('one_time', 'recurring_monthly', 'recurring')),
+  billing_months        INTEGER,
+  billing_interval      VARCHAR(10) DEFAULT 'month' CHECK (billing_interval IN ('day', 'week', 'month', 'year')),
+  billing_interval_count INTEGER DEFAULT 1 CHECK (billing_interval_count >= 1),
   discount_percent DECIMAL(5,2),
   company_name     VARCHAR(255),
   company_address  TEXT,
@@ -32,3 +34,26 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_offers_code       ON offers (UPPER(code));
 CREATE INDEX IF NOT EXISTS idx_orders_session_id ON orders (stripe_session_id);
 CREATE INDEX IF NOT EXISTS idx_orders_sub_id     ON orders (stripe_subscription_id);
+
+-- Migration: add billing_interval columns to existing tables
+DO $$ BEGIN
+  ALTER TABLE offers ADD COLUMN billing_interval VARCHAR(10) DEFAULT 'month'
+    CHECK (billing_interval IN ('day', 'week', 'month', 'year'));
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE offers ADD COLUMN billing_interval_count INTEGER DEFAULT 1
+    CHECK (billing_interval_count >= 1);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+DO $$ DECLARE cname text;
+BEGIN
+  SELECT conname INTO cname FROM pg_constraint
+    WHERE conrelid = 'offers'::regclass AND contype = 'c'
+    AND conname LIKE '%billing_cycle%';
+  IF cname IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE offers DROP CONSTRAINT ' || quote_ident(cname);
+  END IF;
+  ALTER TABLE offers ADD CONSTRAINT offers_billing_cycle_check
+    CHECK (billing_cycle IN ('one_time', 'recurring_monthly', 'recurring'));
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

@@ -28,6 +28,7 @@ router.post('/offers', async (req, res) => {
   const {
     code, description, amount, currency = 'EUR',
     billing_cycle, billing_months,
+    billing_interval = 'month', billing_interval_count = 1,
     discount_percent,
     company_name, company_address, company_zip,
     company_pec, company_phone, company_sdi,
@@ -38,24 +39,36 @@ router.post('/offers', async (req, res) => {
     return res.status(400).json({ error: 'Campi obbligatori mancanti: code, description, amount, billing_cycle' });
   }
 
-  if (!['one_time', 'recurring_monthly'].includes(billing_cycle)) {
-    return res.status(400).json({ error: "billing_cycle deve essere 'one_time' o 'recurring_monthly'" });
+  if (!['one_time', 'recurring_monthly', 'recurring'].includes(billing_cycle)) {
+    return res.status(400).json({ error: "billing_cycle deve essere 'one_time', 'recurring_monthly' o 'recurring'" });
+  }
+
+  if (billing_cycle === 'recurring') {
+    if (!['day', 'week', 'month', 'year'].includes(billing_interval)) {
+      return res.status(400).json({ error: "billing_interval deve essere 'day', 'week', 'month' o 'year'" });
+    }
+    if (!Number.isInteger(Number(billing_interval_count)) || Number(billing_interval_count) < 1) {
+      return res.status(400).json({ error: 'billing_interval_count deve essere un intero >= 1' });
+    }
   }
 
   try {
     const result = await db.query(
       `INSERT INTO offers (
          code, description, amount, currency, billing_cycle, billing_months,
+         billing_interval, billing_interval_count,
          discount_percent,
          company_name, company_address, company_zip, company_pec, company_phone, company_sdi
        ) VALUES (
          UPPER($1), $2, $3, $4, $5, $6,
-         $7,
-         $8, $9, $10, $11, $12, $13
+         $7, $8,
+         $9,
+         $10, $11, $12, $13, $14, $15
        ) RETURNING *`,
       [
         code, description, amount, currency.toUpperCase(), billing_cycle,
         billing_months ? parseInt(billing_months) : null,
+        billing_interval, Number(billing_interval_count),
         discount_percent ? parseFloat(discount_percent) : null,
         company_name   || null, company_address || null, company_zip  || null,
         company_pec    || null, company_phone   || null, company_sdi  || null,
