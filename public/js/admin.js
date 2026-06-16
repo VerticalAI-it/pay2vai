@@ -61,7 +61,10 @@
     return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
-  function badgeHtml(is_active) {
+  function badgeHtml(is_active, use_count, max_uses) {
+    if (use_count >= max_uses) {
+      return '<span class="badge-inactive text-xs font-semibold px-2 py-0.5 rounded-full">Esaurita</span>';
+    }
     return is_active
       ? '<span class="badge-active text-xs font-semibold px-2 py-0.5 rounded-full">Attiva</span>'
       : '<span class="badge-inactive text-xs font-semibold px-2 py-0.5 rounded-full">Inattiva</span>';
@@ -187,18 +190,27 @@
       const clientLabel = o.company_name
         ? `<span class="font-medium text-gray-700">${o.company_name}</span><br/><span class="text-gray-400 text-xs">${(o.description || '').substring(0, 40)}…</span>`
         : `<span class="text-gray-600">${(o.description || '').substring(0, 55)}</span>`;
+      const useCount = parseInt(o.use_count) || 0;
+      const maxUses  = parseInt(o.max_uses)  || 1;
+      const exhausted = useCount >= maxUses;
+      const toggleBtn = exhausted
+        ? '<span class="text-xs text-gray-300">Esaurita</span>'
+        : `<button onclick="toggleOffer(${o.id}, ${!o.is_active})"
+            class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">
+            ${o.is_active ? 'Disattiva' : 'Attiva'}
+          </button>`;
       return `
       <tr class="hover:bg-gray-50">
         <td class="px-6 py-3 font-mono font-semibold text-gray-800">${o.code}</td>
         <td class="px-6 py-3">${clientLabel}</td>
         <td class="px-6 py-3 font-semibold text-gray-800 whitespace-nowrap">${priceCell}</td>
         <td class="px-6 py-3 text-gray-500 whitespace-nowrap">${billingText(o.billing_cycle, o.billing_months, o.billing_interval, o.billing_interval_count)}</td>
-        <td class="px-6 py-3">${badgeHtml(o.is_active)}</td>
+        <td class="px-6 py-3">
+          ${badgeHtml(o.is_active, useCount, maxUses)}
+          <span class="block text-xs text-gray-400 mt-0.5">${useCount}/${maxUses} utilizzi</span>
+        </td>
         <td class="px-6 py-3 flex gap-3">
-          <button onclick="toggleOffer(${o.id}, ${!o.is_active})"
-            class="text-xs text-indigo-500 hover:text-indigo-700 font-medium">
-            ${o.is_active ? 'Disattiva' : 'Attiva'}
-          </button>
+          ${toggleBtn}
           <button onclick="deleteOffer(${o.id})"
             class="text-xs text-red-400 hover:text-red-600 font-medium">
             Elimina

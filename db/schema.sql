@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS offers (
   company_phone    VARCHAR(50),
   company_sdi      VARCHAR(20),
   is_active        BOOLEAN NOT NULL DEFAULT true,
+  max_uses         INTEGER NOT NULL DEFAULT 1,
+  use_count        INTEGER NOT NULL DEFAULT 0,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -44,6 +46,14 @@ EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE offers ADD COLUMN billing_interval_count INTEGER DEFAULT 1
     CHECK (billing_interval_count >= 1);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE offers ADD COLUMN max_uses INTEGER NOT NULL DEFAULT 1;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE offers ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0;
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 DO $$ DECLARE cname text;

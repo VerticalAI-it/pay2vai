@@ -18,14 +18,15 @@ router.post('/', async (req, res) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
-        await db.query(
+        const orderResult = await db.query(
           `UPDATE orders SET
             status = 'completed',
             customer_email = $1,
             amount_paid = $2,
             stripe_subscription_id = $3,
             completed_at = NOW()
-           WHERE stripe_session_id = $4`,
+           WHERE stripe_session_id = $4
+           RETURNING offer_id`,
           [
             session.customer_details?.email || null,
             session.amount_total ? session.amount_total / 100 : null,
@@ -33,6 +34,15 @@ router.post('/', async (req, res) => {
             session.id,
           ]
         );
+        if (orderResult.rows.length > 0 && orderResult.rows[0].offer_id) {
+          await db.query(
+            `UPDATE offers
+             SET use_count = use_count + 1,
+                 is_active = CASE WHEN use_count + 1 >= max_uses THEN false ELSE is_active END
+             WHERE id = $1`,
+            [orderResult.rows[0].offer_id]
+          );
+        }
         break;
       }
 

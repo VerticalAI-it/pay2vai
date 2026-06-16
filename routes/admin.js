@@ -97,6 +97,16 @@ router.post('/offers', async (req, res) => {
 router.patch('/offers/:id', async (req, res) => {
   const { is_active } = req.body;
   try {
+    if (is_active) {
+      const check = await db.query(
+        'SELECT use_count, max_uses FROM offers WHERE id = $1',
+        [req.params.id]
+      );
+      if (check.rows.length === 0) return res.status(404).json({ error: 'Offerta non trovata' });
+      if (check.rows[0].use_count >= check.rows[0].max_uses) {
+        return res.status(403).json({ error: 'Offerta esaurita: numero massimo di utilizzi raggiunto' });
+      }
+    }
     const result = await db.query(
       'UPDATE offers SET is_active = $1 WHERE id = $2 RETURNING *',
       [is_active, req.params.id]
