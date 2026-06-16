@@ -118,12 +118,28 @@
                 <option value="one_time">Pagamento unico (una tantum)</option>
                 <option value="recurring">Ricorrente mensile (senza scadenza)</option>
                 <option value="recurring_limited">Ricorrente mensile (numero di mesi)</option>
+                <option value="recurring_custom">Ricorrente personalizzato (giorni / settimane / mesi / anni)</option>
               </select>
             </div>
             <div id="billing-months-wrap" class="hidden">
               <label class="block text-xs font-semibold text-gray-500 mb-1">Numero di mesi *</label>
               <input id="f-billing-months" type="number" min="1" step="1" placeholder="12"
                 class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+            <div id="billing-custom-wrap" class="hidden sm:col-span-2">
+              <label class="block text-xs font-semibold text-gray-500 mb-1">Intervallo ricorrente *</label>
+              <div class="flex gap-3 items-center">
+                <input id="f-billing-interval-count" type="number" min="1" step="1" placeholder="1"
+                  class="w-24 border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <select id="f-billing-interval"
+                  class="flex-1 border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                  <option value="day">Giorni</option>
+                  <option value="week">Settimane</option>
+                  <option value="month" selected>Mesi</option>
+                  <option value="year">Anni</option>
+                </select>
+              </div>
+              <p class="text-xs text-gray-400 mt-1">Es: 7 Giorni = addebitato ogni 7 giorni · 3 Mesi = trimestrale</p>
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1">Valuta</label>

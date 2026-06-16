@@ -78,8 +78,14 @@
     return `<span class="${cls} text-xs font-semibold px-2 py-0.5 rounded-full">${label}</span>`;
   }
 
-  function billingText(billing_cycle, billing_months) {
+  function billingText(billing_cycle, billing_months, billing_interval, billing_interval_count) {
     if (billing_cycle === 'one_time') return 'Una tantum';
+    if (billing_cycle === 'recurring') {
+      const count = billing_interval_count || 1;
+      const labels = { day: ['giorno','giorni'], week: ['settimana','settimane'], month: ['mese','mesi'], year: ['anno','anni'] };
+      const [s, p] = labels[billing_interval] || ['mese','mesi'];
+      return count === 1 ? `Ogni ${s}` : `Ogni ${count} ${p}`;
+    }
     if (billing_months) return `Mensile · ${billing_months} mesi`;
     return 'Mensile';
   }
@@ -115,6 +121,7 @@
   window.onBillingTypeChange = () => {
     const val = document.getElementById('f-billing-type').value;
     document.getElementById('billing-months-wrap').classList.toggle('hidden', val !== 'recurring_limited');
+    document.getElementById('billing-custom-wrap').classList.toggle('hidden', val !== 'recurring_custom');
   };
 
   // ---- Invoice toggle ----
@@ -185,7 +192,7 @@
         <td class="px-6 py-3 font-mono font-semibold text-gray-800">${o.code}</td>
         <td class="px-6 py-3">${clientLabel}</td>
         <td class="px-6 py-3 font-semibold text-gray-800 whitespace-nowrap">${priceCell}</td>
-        <td class="px-6 py-3 text-gray-500 whitespace-nowrap">${billingText(o.billing_cycle, o.billing_months)}</td>
+        <td class="px-6 py-3 text-gray-500 whitespace-nowrap">${billingText(o.billing_cycle, o.billing_months, o.billing_interval, o.billing_interval_count)}</td>
         <td class="px-6 py-3">${badgeHtml(o.is_active)}</td>
         <td class="px-6 py-3 flex gap-3">
           <button onclick="toggleOffer(${o.id}, ${!o.is_active})"
@@ -231,14 +238,22 @@
     const billingMonths = billingType === 'recurring_limited'
       ? parseInt(document.getElementById('f-billing-months').value)
       : null;
+    const billingInterval      = document.getElementById('f-billing-interval').value;
+    const billingIntervalCount = parseInt(document.getElementById('f-billing-interval-count').value) || 1;
+
+    let billingCycle = 'one_time';
+    if (billingType === 'recurring' || billingType === 'recurring_limited') billingCycle = 'recurring_monthly';
+    if (billingType === 'recurring_custom') billingCycle = 'recurring';
 
     const payload = {
       code:          document.getElementById('f-code').value.trim(),
       description:   descTexts.join('\n\n'),
       amount:        parseFloat(document.getElementById('f-amount').value),
       currency:      document.getElementById('f-currency').value,
-      billing_cycle: billingType === 'one_time' ? 'one_time' : 'recurring_monthly',
+      billing_cycle: billingCycle,
       billing_months: billingMonths || undefined,
+      billing_interval:       billingType === 'recurring_custom' ? billingInterval : undefined,
+      billing_interval_count: billingType === 'recurring_custom' ? billingIntervalCount : undefined,
       discount_percent: parseFloat(document.getElementById('f-discount').value) || undefined,
       company_name:    document.getElementById('f-company-name').value.trim() || undefined,
       company_address: document.getElementById('f-company-address').value.trim() || undefined,
@@ -257,6 +272,11 @@
     }
     if (billingType === 'recurring_limited' && (!billingMonths || billingMonths < 1)) {
       formError.textContent = 'Inserisci un numero di mesi valido.';
+      formError.classList.remove('hidden');
+      return;
+    }
+    if (billingType === 'recurring_custom' && billingIntervalCount < 1) {
+      formError.textContent = 'Inserisci un intervallo valido (es. 7 giorni).';
       formError.classList.remove('hidden');
       return;
     }
@@ -325,7 +345,7 @@
         <td class="px-6 py-3 text-gray-700">${o.customer_email || '—'}</td>
         <td class="px-6 py-3 font-mono text-gray-700">${o.offer_code || '—'}</td>
         <td class="px-6 py-3 font-semibold text-gray-800">${o.amount_paid != null ? fmt(o.amount_paid) : '—'}</td>
-        <td class="px-6 py-3 text-gray-500">${billingText(o.billing_cycle, o.billing_months)}</td>
+        <td class="px-6 py-3 text-gray-500">${billingText(o.billing_cycle, o.billing_months, o.billing_interval, o.billing_interval_count)}</td>
         <td class="px-6 py-3">${orderBadge(o.status)}</td>
       </tr>
     `).join('');
