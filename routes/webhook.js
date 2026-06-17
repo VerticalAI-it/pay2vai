@@ -35,13 +35,26 @@ router.post('/', async (req, res) => {
           ]
         );
         if (orderResult.rows.length > 0 && orderResult.rows[0].offer_id) {
-          await db.query(
+          const offerId = orderResult.rows[0].offer_id;
+
+          const offerResult = await db.query(
             `UPDATE offers
              SET use_count = use_count + 1,
                  is_active = CASE WHEN use_count + 1 >= max_uses THEN false ELSE is_active END
-             WHERE id = $1`,
-            [orderResult.rows[0].offer_id]
+             WHERE id = $1
+             RETURNING billing_months`,
+            [offerId]
           );
+
+          // Se l'offerta ha billing_months, imposta cancel_at sulla subscription
+          const billingMonths = offerResult.rows[0]?.billing_months;
+          if (session.subscription && billingMonths) {
+            const cancelAt = new Date();
+            cancelAt.setMonth(cancelAt.getMonth() + parseInt(billingMonths));
+            await stripe.subscriptions.update(session.subscription, {
+              cancel_at: Math.floor(cancelAt.getTime() / 1000),
+            });
+          }
         }
         break;
       }

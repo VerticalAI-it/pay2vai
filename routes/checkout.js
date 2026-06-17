@@ -97,10 +97,7 @@ router.post('/checkout', async (req, res) => {
     };
 
     if (isRecurring && offer.billing_months) {
-      const cancelDate = new Date();
-      cancelDate.setMonth(cancelDate.getMonth() + parseInt(offer.billing_months));
       sessionParams.subscription_data = {
-        cancel_at: Math.floor(cancelDate.getTime() / 1000),
         metadata: { billing_months: offer.billing_months.toString() },
       };
     }
